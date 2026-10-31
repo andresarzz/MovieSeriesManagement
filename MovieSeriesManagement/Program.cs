@@ -19,19 +19,19 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
-// Modifica la configuraci髇 de Identity para ser m醩 permisiva con los requisitos
+// Modifica la configuraci贸n de Identity para ser m谩s permisiva con los requisitos
 builder.Services.AddDefaultIdentity<ApplicationUser>(options => {
     options.SignIn.RequireConfirmedAccount = false;
     options.SignIn.RequireConfirmedEmail = false;
 
-    // Configuraci髇 de contrase馻 menos estricta para desarrollo
+    // Configuraci贸n de contrase帽a menos estricta para desarrollo
     options.Password.RequireDigit = true;
     options.Password.RequireLowercase = true;
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequireUppercase = true;
     options.Password.RequiredLength = 6;
 
-    // Configuraci髇 de usuario
+    // Configuraci贸n de usuario
     options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
     options.User.RequireUniqueEmail = true;
 })
@@ -96,21 +96,20 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// Seed admin user
-using (var scope = app.Services.CreateScope())
+// Optional administrator account for local development only.
+// No privileged account is created with a hardcoded password in production.
+if (app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("SeedAdmin:Enabled"))
 {
+    var adminEmail = builder.Configuration["SeedAdmin:Email"];
+    var adminPassword = builder.Configuration["SeedAdmin:Password"];
+    if (string.IsNullOrWhiteSpace(adminEmail) || string.IsNullOrWhiteSpace(adminPassword) || adminPassword.Length < 12)
+        throw new InvalidOperationException("Configure SeedAdmin:Email and a password of at least 12 characters in user secrets or environment variables.");
+
+    using var scope = app.Services.CreateScope();
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-
-    // Datos del administrador
-    string adminEmail = "admin@movieflix.com";
-    string adminPassword = "Admin123!";
-
-    // Comprobar si el administrador ya existe
     var adminUser = await userManager.FindByEmailAsync(adminEmail);
-
     if (adminUser == null)
     {
-        // Crear el usuario administrador
         var admin = new ApplicationUser
         {
             UserName = adminEmail,
@@ -120,18 +119,20 @@ using (var scope = app.Services.CreateScope())
             LastName = "System",
             ProfilePictureUrl = "/images/profiles/default-profile.jpg"
         };
-
-        var result = await userManager.CreateAsync(admin, adminPassword);
-
-        if (result.Succeeded)
-        {
-            // Asignar el rol de administrador
-            await userManager.AddToRoleAsync(admin, "Admin");
-        }
+        var creation = await userManager.CreateAsync(admin, adminPassword);
+        if (!creation.Succeeded)
+            throw new InvalidOperationException("Could not create development admin account.");
+        adminUser = admin;
+    }
+    if (!await userManager.IsInRoleAsync(adminUser, "Admin"))
+    {
+        var added = await userManager.AddToRoleAsync(adminUser, "Admin");
+        if (!added.Succeeded)
+            throw new InvalidOperationException("Could not assign development admin role.");
     }
 }
 
-// A馻dir despu閟 de la configuraci髇 de la aplicaci髇, justo antes de app.Run():
+// A帽adir despu茅s de la configuraci贸n de la aplicaci贸n, justo antes de app.Run():
 
 // Asegurarse de que existan las carpetas necesarias
 var webRootPath = app.Environment.WebRootPath;

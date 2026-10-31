@@ -1,0 +1,25 @@
+name: Verify .NET 8 build
+
+on:
+  push:
+    branches: [portfolio-docs-2026-10-31]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        run: dotnet restore MovieSeriesManagement/MovieSeriesManagement.csproj
+      - name: Build
+        run: dotnet build MovieSeriesManagement/MovieSeriesManagement.csproj --no-restore --configuration Release
